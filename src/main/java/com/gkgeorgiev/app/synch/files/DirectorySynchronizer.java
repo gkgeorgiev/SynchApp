@@ -6,15 +6,19 @@ import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
+import static java.util.logging.Level.SEVERE;
 
 /**
  * Created by Georgi on 19-Jul-17.
  */
 public abstract class  DirectorySynchronizer {
+    private static final Logger LOGGER = Logger.getLogger(DirectorySynchronizer.class.getName());
 
     protected Path sourceDir, targetDir;
 
@@ -41,7 +45,7 @@ public abstract class  DirectorySynchronizer {
             try {
                 synchDir();
             } catch (IOException e) {
-                e.printStackTrace(); //TODO
+                LOGGER.log(SEVERE, "Ups...", e);
             }
         });
 
@@ -66,7 +70,7 @@ public abstract class  DirectorySynchronizer {
                 try {
                     dir.register(watchService, ENTRY_CREATE, ENTRY_DELETE, ENTRY_MODIFY);
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    LOGGER.log(SEVERE, "Ups...", e);
                 }
             });
 
@@ -91,21 +95,31 @@ public abstract class  DirectorySynchronizer {
     }
 
     protected void copyFile(Path srcDir) throws IOException {
+        LOGGER.log(Level.FINE, "copyFile({0})", srcDir);
         //check if the same file structure exists at the target dir
         Path targetFile = this.targetDir.resolve(this.sourceDir.relativize(srcDir));
 
-        if (Files.exists(targetFile)) {
+        //TODO not well tested code
+        /*if (Files.exists(targetFile)) {
             Path backupFile = Paths.get(targetFile.toAbsolutePath().toString() + ".bak");
             Files.deleteIfExists(backupFile);
             Files.move(targetFile, backupFile,StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-        } else {
+        } else {*/
+        if (!Files.exists(targetFile) && srcDir.toString().indexOf("@eaDir")<0) {
             Files.createDirectories(targetFile.getParent()); //recreating the directory structure
+            LOGGER.log(Level.INFO, "...to ({0})", targetFile);
+            Files.copy(srcDir, targetFile, LinkOption.NOFOLLOW_LINKS, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
+            LOGGER.info("Copied successfully completed.");
+        } else {
+            LOGGER.fine("File already exists.");
         }
-
-        Files.copy(srcDir, targetFile, LinkOption.NOFOLLOW_LINKS, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
     }
 
-
+    /**
+     * TODO add logging
+     * @param pathToDelete
+     * @throws IOException
+     */
     protected void deleteFile(Path pathToDelete) throws IOException {
         Path targetFile = this.targetDir.resolve(this.sourceDir.relativize(pathToDelete));
         if (!Files.isDirectory(targetFile)) {

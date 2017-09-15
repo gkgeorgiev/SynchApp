@@ -2,14 +2,19 @@ package com.gkgeorgiev.app.synch.files;
 
 
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.WatchService;
 import java.util.concurrent.BrokenBarrierException;
-import static java.nio.file.StandardWatchEventKinds.*;
+import java.util.logging.Logger;
+
+import static java.util.logging.Level.SEVERE;
 
 /**
  * Created by Georgi on 19-Jul-17.
  */
 public class UniDirectionalSynchronizer extends DirectorySynchronizer {
+    private static final Logger LOGGER = Logger.getLogger(UniDirectionalSynchronizer.class.getName());
 
     public UniDirectionalSynchronizer(Path source, Path target) throws IOException, BrokenBarrierException, InterruptedException {
         super(source, target);
@@ -18,8 +23,9 @@ public class UniDirectionalSynchronizer extends DirectorySynchronizer {
     @Override
     public Runnable initSourceWatcher(WatchService watchService) {
         return () ->{
-                while (true) {
-                    System.out.println("watch again " );
+            //TODO not tested well
+               /* while (true) {
+                    LOGGER.fine("watch again " );
                     try {
                         WatchKey key = watchService.take();
 
@@ -30,6 +36,9 @@ public class UniDirectionalSynchronizer extends DirectorySynchronizer {
                             WatchEvent<Path> ev = (WatchEvent<Path>) watchEvent;
                             Path newFile = ev.context();
                             newFile = ((Path)key.watchable()).resolve(newFile); //build the absolute path since the watch event point only to a relative one
+
+                            LOGGER.log(FINE, "Event: {0}; Path: {1}", new Object[]{ kind, newFile});
+
                             try {
                                 if (ENTRY_CREATE.equals(kind)) {
                                     if (Files.isDirectory(newFile)) {
@@ -44,16 +53,17 @@ public class UniDirectionalSynchronizer extends DirectorySynchronizer {
                                         copyFile(newFile);
                                     }
                                 }
+                                LOGGER.info("Operation completed");
                             } catch (IOException e) {
-                                e.printStackTrace();
+                                LOGGER.log(SEVERE, "Ups...", e);
                             }
                         });
 
                         key.reset();
                     } catch (InterruptedException e) {
-                        e.printStackTrace();//todo logging
+                        LOGGER.log(SEVERE, "Ups...", e);
                     }
-                }
+                }*/
         };
     }
 
@@ -66,13 +76,15 @@ public class UniDirectionalSynchronizer extends DirectorySynchronizer {
 
     @Override
     public void synchDir() throws IOException {
-//        synchDir(sourceDir, targetDir);
+        LOGGER.entering(UniDirectionalSynchronizer.class.getName(), "synchDir", sourceDir);
+
         Files.walk(sourceDir).parallel().filter((path)->Files.isRegularFile(path)).forEach(path -> {
             try {
                 copyFile(path);
             } catch (IOException e) {
-                e.printStackTrace();
+                LOGGER.log(SEVERE, "Ups...", e);
             }
         });
+        LOGGER.exiting(UniDirectionalSynchronizer.class.getName(), "synchDir");
     }
 }
